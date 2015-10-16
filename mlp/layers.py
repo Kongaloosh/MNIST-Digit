@@ -308,94 +308,51 @@ class Softmax(Linear):
         :return: h^i, matrix of transformed by layer features
         """
         a = numpy.dot(inputs, self.W) + self.b
-        y = [numpy.exp(k)/numpy.exp(j) for j in a for k in a]
+        denom = sum([numpy.exp(j) for j in a])
+        y = numpy.array([numpy.exp(k)/denom for k in a])
+        # I HATE EVERYTHING
         # here f() is an identity function, so just return a linear transformation
-
         return y
-
-    def bprop(self, h, igrads):
-        """
-        Implements a backward propagation through the layer, that is, given
-        h^i denotes the output of the layer and x^i the input, we compute:
-        dh^i/dx^i which by chain rule is dh^i/da^i da^i/dx^i
-        x^i could be either features (x) or the output of the lower layer h^{i-1}
-
-
-        :param h: it's an activation produced in forward pass
-        :param igrads, error signal (or gradient) flowing to the layer, note,
-               this in general case does not corresponds to 'deltas' used to update
-               the layer's parameters, to get deltas ones need to multiply it with
-               the dh^i/da^i derivative
-        :return: a tuple (deltas, ograds) where:
-               deltas = igrads * dh^i/da^i
-               ograds = deltas \times da^i/dx^i
-        """
-
-        # since df^i/da^i = yc(d_ck - y_k),
-        h_derivative = max(y)*(igrads-h)
-        ograds = numpy.dot(h_derivative, self.W.T)
-        return igrads, ograds
-
-    def bprop_cost(self, h, igrads, cost):
-        """
-        Implements a backward propagation in case the layer directly
-        deals with the optimised cost (i.e. the top layer)
-        By default, method should implement a bprop for default cost, that is
-        the one that is natural to the layer's output, i.e.:
-        here we implement linear -> mse scenario
-        :param h: it's an activation produced in forward pass
-        :param igrads, error signal (or gradient) flowing to the layer, note,
-               this in general case does not corresponds to 'deltas' used to update
-               the layer's parameters, to get deltas ones need to multiply it with
-               the dh^i/da^i derivative
-        :param cost, mlp.costs.Cost instance defining the used cost
-        :return: a tuple (deltas, ograds) where:
-               deltas = igrads * dh^i/da^i
-               ograds = deltas \times da^i/dx^i
-        """
-
-        if cost is None or cost.get_name() == 'mse':
-            # for linear layer and mean square error cost,
-            # cost back-prop is the same as standard back-prop
-            return self.bprop(h, igrads)
-        else:
-            raise NotImplementedError('Linear.bprop_cost method not implemented '
-                                      'for the %s cost' % cost.get_name())
-
-    def pgrads(self, inputs, deltas):
-        """
-        Return gradients w.r.t parameters
-
-        :param inputs, input to the i-th layer
-        :param deltas, deltas computed in bprop stage up to -ith layer
-        :return list of grads w.r.t parameters dE/dW and dE/db in *exactly*
-                the same order as the params are returned by get_params()
-
-        Note: deltas here contain the whole chain rule leading
-        from the cost up to the the i-th layer, i.e.
-        dE/dy^L dy^L/da^L da^L/dh^{L-1} dh^{L-1}/da^{L-1} ... dh^{i}/da^{i}
-        and here we are just asking about
-          1) da^i/dW^i and 2) da^i/db^i
-        since W and b are only layer's parameters
-        """
-
-        grad_W = numpy.dot(inputs.T, deltas)
-        grad_b = numpy.sum(deltas, axis=0)
-
-        return [grad_W, grad_b]
-
-    def get_params(self):
-        return [self.W, self.b]
-
-    def set_params(self, params):
-        #we do not make checks here, but the order on the list
-        #is assumed to be exactly the same as get_params() returns
-        self.W = params[0]
-        self.b = params[1]
 
     def get_name(self):
         return 'Softmax'
 
-        
-        
-        
+
+class Sigmoid(Linear):
+    """
+    Form of activation where each output is between 0 and 1. The sum of all outputs will be constrained to 1.
+    the output of a network is P(k | x^n)
+    """
+    def __init__(self, idim, odim,
+                 rng=None,
+                 irange=0.1):
+
+        super(Linear, self).__init__(rng=rng)
+
+        self.idim = idim
+        self.odim = odim
+
+        self.W = self.rng.uniform(
+            -irange, irange,
+            (self.idim, self.odim))
+
+        self.b = numpy.zeros((self.odim,), dtype=numpy.float32)
+
+    def fprop(self, inputs):
+        """
+        Implements a forward propagation through the i-th layer, that is
+        some form of:
+           a^i = xW^i + b^i
+           h^i = f^i(a^i)
+        with f^i, W^i, b^i denoting a non-linearity, weight matrix and
+        biases of this (i-th) layer, respectively and x denoting inputs.
+
+        :param inputs: matrix of features (x) or the output of the previous layer h^{i-1}
+        :return: h^i, matrix of transformed by layer features
+        """
+        a = numpy.dot(inputs, self.W) + self.b
+        y = 1/(1 + numpy.exp(-1 * a))
+        return y
+
+    def get_name(self):
+        return 'Sigmoid'
