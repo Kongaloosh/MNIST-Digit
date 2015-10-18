@@ -191,6 +191,7 @@ class Linear(Layer):
         """
         a = numpy.dot(inputs, self.W) + self.b
         # here f() is an identity function, so just return a linear transformation
+        # logger.info(a)
         return a
 
     def bprop(self, h, igrads):
@@ -309,12 +310,18 @@ class Softmax(Linear):
         :param inputs: matrix of features (x) or the output of the previous layer h^{i-1}
         :return: h^i, matrix of transformed by layer features
         """
-        logger.info("softie fprop")
+        # logger.info("softie fprop")
         a = numpy.dot(inputs, self.W) + self.b
-        logger.info(a.shape)
-        denom = sum([numpy.exp(j) for j in a])
-        if denom == 0:
-            denom = 1
+        # logger.info(a.shape)
+        # denom = sum([numpy.exp(j) for j in a])
+        denom = 0
+        for i in a:
+            denom += numpy.exp(i)
+
+
+        # logger.info(denom)
+        # if denom == 0:
+        #     denom = 1
         y = numpy.array([numpy.exp(k)/denom for k in a])
         # I HATE EVERYTHING
         return y
@@ -337,7 +344,7 @@ class Softmax(Linear):
 
         # since df^i/da^i = 1 (f is assumed identity function),
         # deltas are in fact the same as igrads
-        logger.info("softie base bprop")
+        # logger.info("softie base bprop")
         ograds = numpy.dot(igrads, self.W.T)
         return igrads, ograds
 
@@ -372,7 +379,7 @@ class Softmax(Linear):
         #             derivative.append(h_c*(-1*h_k))
 
             # ograds = numpy.dot(igrads*derivative, self.W.T)
-        logger.info("softie proper bprop")
+        # logger.info("softie proper bprop")
         ograds = numpy.dot(igrads, self.W.T)
         return igrads, ograds
 
@@ -466,7 +473,8 @@ class Sigmoid(Linear):
 
         # since df^i/da^i = 1 (f is assumed identity function),
         # deltas are in fact the same as igrads
-        ograds = numpy.dot(igrads, self.W.T)
+        derivative = h*(1-h)
+        ograds = numpy.dot(igrads*derivative, self.W.T)
         return igrads, ograds
 
     def bprop_sigmoid(self, h, igrads):
@@ -487,9 +495,10 @@ class Sigmoid(Linear):
 
         # since df^i/da^i = 1 (f is assumed identity function),
         # deltas are in fact the same as igrads
-        derivative = h*(1-h)
-        ograds = numpy.dot(igrads*derivative, self.W.T)
+
+        ograds = numpy.dot(igrads, self.W.T)
         return igrads, ograds
+
 
     def bprop_cost(self, h, igrads, cost):
         """
@@ -516,7 +525,7 @@ class Sigmoid(Linear):
             return self.bprop(h, igrads)
         if  cost.get_name() == 'ce':
             # for sigmoid
-            return self.bprop_sigmoid(h, igrads)
+            return self.bprop(h, igrads)
         else:
             raise NotImplementedError('Sigmoid.bprop_cost method not implemented '
                                       'for the %s cost' % cost.get_name())
