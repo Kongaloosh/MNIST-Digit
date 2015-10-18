@@ -231,6 +231,8 @@ class Linear(Layer):
                deltas = igrads * dh^i/da^i
                ograds = deltas \times da^i/dx^i
         """
+        # so we need to use the cost function which is natural for a softmax layer
+        # in this situation we need to use
 
         if cost is None or cost.get_name() == 'mse':
             # for linear layer and mean square error cost,
@@ -307,12 +309,104 @@ class Softmax(Linear):
         :param inputs: matrix of features (x) or the output of the previous layer h^{i-1}
         :return: h^i, matrix of transformed by layer features
         """
+        logger.info("softie fprop")
         a = numpy.dot(inputs, self.W) + self.b
+        logger.info(a.shape)
         denom = sum([numpy.exp(j) for j in a])
+        if denom == 0:
+            denom = 1
         y = numpy.array([numpy.exp(k)/denom for k in a])
         # I HATE EVERYTHING
-        # here f() is an identity function, so just return a linear transformation
         return y
+
+    def bprop(self, h, igrads):
+        """
+        Implements a backward propagation through the layer, that is, given
+        h^i denotes the output of the layer and x^i the input, we compute:
+        dh^i/dx^i which by chain rule is dh^i/da^i da^i/dx^i
+        x^i could be either features (x) or the output of the lower layer h^{i-1}
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+
+        # since df^i/da^i = 1 (f is assumed identity function),
+        # deltas are in fact the same as igrads
+        logger.info("softie base bprop")
+        ograds = numpy.dot(igrads, self.W.T)
+        return igrads, ograds
+
+    def bprop_softmax(self, h, igrads):
+        """
+        Implements a backward propagation through the layer, that is, given
+        h^i denotes the output of the layer and x^i the input, we compute:
+        dh^i/dx^i which by chain rule is dh^i/da^i da^i/dx^i
+        x^i could be either features (x) or the output of the lower layer h^{i-1}
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+
+        # since df^i/da^i = 1 (f is assumed identity function),
+        # deltas are in fact the same as igrads
+
+        # h_c (kronker - h_k)
+        derivatives = []
+        # for i in h:
+        #     h_c = max(i)
+        #     derivative = []
+        #     for h_k in h:
+        #         if h_k == h_c:
+        #             derivative.append(h_c*(1-h_k))
+        #         else:
+        #             derivative.append(h_c*(-1*h_k))
+
+            # ograds = numpy.dot(igrads*derivative, self.W.T)
+        logger.info("softie proper bprop")
+        ograds = numpy.dot(igrads, self.W.T)
+        return igrads, ograds
+
+    def bprop_cost(self, h, igrads, cost):
+        """
+        Implements a backward propagation in case the layer directly
+        deals with the optimised cost (i.e. the top layer)
+        By default, method should implement a bprop for default cost, that is
+        the one that is natural to the layer's output, i.e.:
+        here we implement linear -> mse scenario
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :param cost, mlp.costs.Cost instance defining the used cost
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+        # so we need to use the cost function which is natural for a softmax layer
+        # in this situation we need to use
+
+        if cost is None or cost.get_name() == 'mse':
+            # for linear layer and mean square error cost,
+            # cost back-prop is the same as standard back-prop
+            return self.bprop(h, igrads)
+        if cost.get_name() == 'ce':
+            # for softmax
+            return self.bprop_softmax(h, igrads)
+        else:
+            raise NotImplementedError('Softmax.bprop_cost method not implemented '
+                                      'for the %s cost' % cost.get_name())
+
 
     def get_name(self):
         return 'Softmax'
@@ -353,6 +447,80 @@ class Sigmoid(Linear):
         a = numpy.dot(inputs, self.W) + self.b
         y = 1/(1 + numpy.exp(-1 * a))
         return y
+
+    def bprop(self, h, igrads):
+        """
+        Implements a backward propagation through the layer, that is, given
+        h^i denotes the output of the layer and x^i the input, we compute:
+        dh^i/dx^i which by chain rule is dh^i/da^i da^i/dx^i
+        x^i could be either features (x) or the output of the lower layer h^{i-1}
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+
+        # since df^i/da^i = 1 (f is assumed identity function),
+        # deltas are in fact the same as igrads
+        ograds = numpy.dot(igrads, self.W.T)
+        return igrads, ograds
+
+    def bprop_sigmoid(self, h, igrads):
+        """
+        Implements a backward propagation through the layer, that is, given
+        h^i denotes the output of the layer and x^i the input, we compute:
+        dh^i/dx^i which by chain rule is dh^i/da^i da^i/dx^i
+        x^i could be either features (x) or the output of the lower layer h^{i-1}
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+
+        # since df^i/da^i = 1 (f is assumed identity function),
+        # deltas are in fact the same as igrads
+        derivative = h*(1-h)
+        ograds = numpy.dot(igrads*derivative, self.W.T)
+        return igrads, ograds
+
+    def bprop_cost(self, h, igrads, cost):
+        """
+        Implements a backward propagation in case the layer directly
+        deals with the optimised cost (i.e. the top layer)
+        By default, method should implement a bprop for default cost, that is
+        the one that is natural to the layer's output, i.e.:
+        here we implement linear -> mse scenario
+        :param h: it's an activation produced in forward pass
+        :param igrads, error signal (or gradient) flowing to the layer, note,
+               this in general case does not corresponds to 'deltas' used to update
+               the layer's parameters, to get deltas ones need to multiply it with
+               the dh^i/da^i derivative
+        :param cost, mlp.costs.Cost instance defining the used cost
+        :return: a tuple (deltas, ograds) where:
+               deltas = igrads * dh^i/da^i
+               ograds = deltas \times da^i/dx^i
+        """
+        # so we need to use the cost function which is natural for a softmax layer
+        # in this situation we need to use
+        if cost is None or cost.get_name() == 'mse':
+            # for linear layer and mean square error cost,
+            # cost back-prop is the same as standard back-prop
+            return self.bprop(h, igrads)
+        if  cost.get_name() == 'ce':
+            # for sigmoid
+            return self.bprop_sigmoid(h, igrads)
+        else:
+            raise NotImplementedError('Sigmoid.bprop_cost method not implemented '
+                                      'for the %s cost' % cost.get_name())
+
 
     def get_name(self):
         return 'Sigmoid'
