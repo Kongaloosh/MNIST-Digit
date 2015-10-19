@@ -310,20 +310,23 @@ class Softmax(Linear):
         :param inputs: matrix of features (x) or the output of the previous layer h^{i-1}
         :return: h^i, matrix of transformed by layer features
         """
-        # logger.info("softie fprop")
         a = numpy.dot(inputs, self.W) + self.b
-        # logger.info(a.shape)
-        # denom = sum([numpy.exp(j) for j in a])
-        denom = 0
-        for i in a:
-            denom += numpy.exp(i)
 
+        # denom = 0
+        # for i in a:
+        #     denom = numpy.sum([numpy.exp(j) for j in a], axis=1)
+        #     y = numpy.array([numpy.exp(k)/denom for k in a])
+        #             denom += numpy.exp(i)
 
-        # logger.info(denom)
-        # if denom == 0:
-        #     denom = 1
-        y = numpy.array([numpy.exp(k)/denom for k in a])
-        # I HATE EVERYTHING
+        y = []
+        for i in a:                                     # this is going to be a single mini-batch
+            y_h = numpy.zeros(len(i))
+            for index in range(len(i)):                 # for all of the values to do
+
+                denom  = numpy.sum(numpy.exp(i))        # calculate the normalizer
+                y_h[index] += numpy.exp(i[index])/denom   # normalize the values
+            y.append(y_h)
+        y = numpy.array(y)
         return y
 
     def bprop(self, h, igrads):
@@ -345,8 +348,23 @@ class Softmax(Linear):
         # since df^i/da^i = 1 (f is assumed identity function),
         # deltas are in fact the same as igrads
         # logger.info("softie base bprop")
+
+
+        derivatives = []
+        # for i in h:
+        #     h_c = max(i)
+        #     derivative = []
+        #     for h_k in h:
+        #         if h_k == h_c:
+        #             derivative.append(h_c*(1-h_k))
+        #         else:
+        #             derivative.append(h_c*(-1*h_k))
+        #
+        # ograds = numpy.dot(igrads*derivative, self.W.T)
+        # logger.info("softie proper bprop")
         ograds = numpy.dot(igrads, self.W.T)
         return igrads, ograds
+
 
     def bprop_softmax(self, h, igrads):
         """
@@ -364,24 +382,11 @@ class Softmax(Linear):
                ograds = deltas \times da^i/dx^i
         """
 
-        # since df^i/da^i = 1 (f is assumed identity function),
-        # deltas are in fact the same as igrads
-
-        # h_c (kronker - h_k)
-        derivatives = []
-        # for i in h:
-        #     h_c = max(i)
-        #     derivative = []
-        #     for h_k in h:
-        #         if h_k == h_c:
-        #             derivative.append(h_c*(1-h_k))
-        #         else:
-        #             derivative.append(h_c*(-1*h_k))
-
-            # ograds = numpy.dot(igrads*derivative, self.W.T)
-        # logger.info("softie proper bprop")
         ograds = numpy.dot(igrads, self.W.T)
         return igrads, ograds
+
+
+
 
     def bprop_cost(self, h, igrads, cost):
         """
@@ -406,7 +411,7 @@ class Softmax(Linear):
         if cost is None or cost.get_name() == 'mse':
             # for linear layer and mean square error cost,
             # cost back-prop is the same as standard back-prop
-            return self.bprop(h, igrads)
+            return self.bprop_softmax(h, igrads)
         if cost.get_name() == 'ce':
             # for softmax
             return self.bprop_softmax(h, igrads)
@@ -453,6 +458,8 @@ class Sigmoid(Linear):
         """
         a = numpy.dot(inputs, self.W) + self.b
         y = 1/(1 + numpy.exp(-1 * a))
+        logger.info(y.shape)
+        # logger.info("boo")
         return y
 
     def bprop(self, h, igrads):
